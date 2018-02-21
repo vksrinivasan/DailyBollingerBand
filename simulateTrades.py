@@ -3,86 +3,56 @@
 
 import numpy as np
 import pandas as pd
+from utils import getListOfStockNames, writeToDisk
 
 from utils import getData
-from bollingerBands import getPredictions
+from bollingerBands import getPositions, getBollingerBandIndicator, getBostian
 
-# Helper function to calculate portfolio dollar value
-# based on shares held/cash on hand
-def calculatePortVal(df_data, index, sPos, sVal):
-    return sVal + (sPos*df_data.iloc[index]['Close'])
+def getReturns(df_data):
+    np_prices = df_data['Close'].values
+    np_returns = (np_prices[1:]/np_prices[:-1])-1
+    return np_returns
 
-# Helper function to update position/wealth
-def handleTrade(sharesNeeded, df_data, index, sVal):
-    closePrice = df_data.iloc[index]['Close']
-    tradeDollarAmount = closePrice * sharesNeeded
-    if(sharesNeeded > 0):
-        sVal = sVal - tradeDollarAmount
-    else:
-        sVal = sVal + tradeDollarAmount
+def calculateReturns(np_positions, np_returns):
+    return np_positions[:-1]*np_returns[:]
 
-    return sVal
+def getResults(np_returns):
+    print('Cumulative Return: ' + str((np.cumprod(np_returns+1)-1)[-1]))
+    print('Sharpe (Annualized): ' + str(np.sqrt(252)*np.mean(np_returns)/np.std(np_returns,ddof=1)))
+    print('Simple Return (Annualized): ' + str(252*np.mean(np_returns)))
+    print('Stdev (Annualized): ' + str(252*np.std(np_returns,ddof=1)))
 
-def getNeutralBuy(df_data, index, sPos, sVal):
-    # Get neutral
-    tradeCostSell = df_data.iloc[index]['Close']*sPos
-    sVal = sVal + tradeCostSell
-    sPos = 0
+    return (np.cumprod(np_returns+1)-1)[-1], np.sqrt(252)*np.mean(np_returns)/np.std(np_returns,ddof=1), 252*np.mean(np_returns), 252*np.std(np_returns,ddof=1)
 
-    # Buy in with 100% of my money - allow for fractional shares
-    sPos = float(sVal)/float(df_data.iloc[index]['Close'])
-    sVal = 0
-
-    return sPos, sVal
-
-def getNeutralSell(df_data, index, sPos, sVal):
-    # get neutral
-    tradeCostBuy = df_data.iloc[index]['Close']*sPos
-    sVal = sVal + tradeCostBuy
-    sPos = 0
-
-    # Short with '100% of my money'
-    sPos = -1*float(sVal)/float(df_data.iloc[index]['Close'])
-    sVal = sVal + float(sPos)*-1*float(df_data.iloc[index]['Close'])
-
-    return sPos, sVal
-
-
-# Workhorse to actually simulate portfolio size
-# sVal: How much cash I start with, will be updated per period
-# sPos: How much stock I start with, will be updated per period
-def simulatePerformance(df_data, np_decisions, sVal=1000000, sPos=0):
-    np_decisions = 100*np_decisions # We need to talk about whether methodology should be capped position sizes
-    np_pos = np.zeros((df_data.shape[0]))
-    np_pVal = np.zeros((df_data.shape[0]))
-
-    for i in range(0, df_data.shape[0],1):
-        if(i == 0):
-            np_pos[i] = 0
-            np_pVal[i] = sVal
-        elif(np_decisions[i] == np_decisions[i-1]):
-            np_pos[i] = sPos
-            np_pVal[i] = calculatePortVal(df_data, i, sPos, sVal)
-        elif(np_decisions[i] > 0):
-            sPos, sVal = getNeutralBuy(df_data, i, sPos, sVal)
-            np_pos[i] = sPos
-            np_pVal[i] = calculatePortVal(df_data, i, sPos, sVal)
-        elif(np_decisions[i] < 0):
-            sPos, sVal = getNeutralSell(df_data, i, sPos, sVal)
-            np_pos[i] = sPos
-            np_pVal[i] = calculatePortVal(df_data, i, sPos, sVal)
-
-
-
-    return np_pVal
 
 def main():
-    df_data = getData()
-    np_decisions = getPredictions(df_data,20)
-    np_pVal = simulatePerformance(df_data, np_decisions)
+    ls_names = getListOfStockNames()
 
-    for val in np_pVal:
-        print val
+    for name in ['A']:#ls_names:
+
+        print("Calculating Results For Name: " + name)
+
+        df_data = getData(str_data_folder="D:\ListedStockHistory\Clean\US\NYSE", str_ticker=name, str_freq="D")
+        np_returns = getReturns(df_data)
+        np_bbp = getBollingerBandIndicator(df_data, 20)
+        np_vi = getBostian(df_data, 20)
+        np_positions = getPositions(np_bbp, np_vi)
+        np_stratReturns = calculateReturns(np_positions, np_returns)
+        cumRet, sharpe, avgRetAnn, volAnn = getResults(np_stratReturns)
+        print(" ")
+
+        dict_results = {'Ticker': name,
+                        'Returns': np_returns,
+                        'Dates': df_data['Date'].values[1:],
+                        'CumRet': cumRet,
+                        'Sharpe': sharpe,
+                        'AvgRetAnn': avgRetAnn,
+                        'volAnn': volAnn}
+
+        writeToDisk(dict_results, name, "D:\Results")
+
+
+
 
 if __name__ == "__main__":
     main()

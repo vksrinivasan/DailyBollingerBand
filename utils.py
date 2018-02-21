@@ -3,6 +3,8 @@
 
 import pandas as pd
 import numpy as np
+from os import listdir
+import pickle
 
 # Get data from Premium Data extracted File
 def getData(str_data_folder=r'C:\Users\Vyas\OneDrive\CS8903\Clean', str_ticker='AZO', str_freq='D'):
@@ -20,6 +22,14 @@ def getTimeScale(df_prices, str_freq):
     if(str_freq=='D'):
         return df_prices
 
+def getListOfStockNames(str_data_folder=r"D:\ListedStockHistory\Clean\US\AMEX"):
+    ls_names = listdir(str_data_folder)
+    ls_names = [x.replace('.csv', '') for x in ls_names]
+    return ls_names
+
+def writeToDisk(dict_results, name, str_data_folder="D:\ListedStockHistory\Clean\US\AMEX"):
+    str_outName = str_data_folder + "//" + name + '.p'
+    pickle.dump(dict_results, open(str_outName, "wb"))
 
 def main():
     getData()

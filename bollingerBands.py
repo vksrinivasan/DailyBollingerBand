@@ -23,48 +23,41 @@ def getBostian(df_data, lookback=20):
     df_temp = pd.DataFrame(np_dailyBostian)
     return np.squeeze(df_temp[[0]].rolling(lookback).sum().values)
 
-
-
-# Outputs np array of trading decisions that can be read by a market simulator
-def getPredictions(df_data, lookback):
+def getBollingerBandIndicator(df_data, lookback, band_width=2):
     np_prices = df_data['Close'].values
-
     np_sma = getSMA(df_data, lookback)
     np_rstd = getRollStd(df_data, lookback)
-    np_vInd = getBostian(df_data, lookback)
 
-    np_low_band = np_sma - (2*np_rstd)
-    np_high_band = np_sma + (2*np_rstd)
+    np_top_bb_band = np_sma + (band_width*np_rstd)
+    np_bottom_bb_band = np_sma - (band_width*np_rstd)
 
-    np_decisions = np.zeros((np_vInd.shape[0]))
+    np_bbp = (np_prices - np_bottom_bb_band) / (np_top_bb_band - np_bottom_bb_band)
 
-    # Now follow the rules outlined by Bollinger:
-    # (1) Buy if we tag the lower band and indicator is positive - Encoded as 1
-    # (2) Sell if we tag the upper band and the indicator is negative - Encoded as -1
-    # Note: Do nothing is encoded as 0
+    return np_bbp
 
-    i = 0 # There might be a better way to do this. I need to index into np_decisions
-    for price, lb, hb, volume in zip(np_prices, np_low_band, np_high_band, np_vInd):
-        if(price <= lb and volume > 0):
+def getPositions(np_bbp, volume_indicator):
+    np_decisions = np.zeros((np_bbp.shape[0]))
+    i = 0
+    for bbp, vi in zip(np_bbp, volume_indicator):
+        if(bbp < 0.0 and vi > 0.0):
             np_decisions[i] = 1
             i = i + 1
             continue
-        if(price >= hb and volume < 0):
-            np_decisions[i] = -1
+        if(bbp > 1.0 and vi < 0.0):
+            np_decisions[i] = 0
             i = i + 1
             continue
 
         if(i != 0):
             np_decisions[i] = np_decisions[i-1]
         i = i + 1
-
     return np_decisions
-
-
 
 def main():
     df_data = getData()
-    getPredictions(df_data,20)
+    np_bbp = getBollingerBandIndicator(df_data, 20)
+    np_vi = getBostian(df_data, 20)
+    np_positions = getPositions(np_bbp, np_vi)
 
 if __name__ == "__main__":
     main()
