@@ -53,6 +53,26 @@ def getPositions(np_bbp, volume_indicator):
         i = i + 1
     return np_decisions
 
+def getPositions_bOnly(np_bbp):
+    np_decisions = np.zeros((np_bbp.shape[0]))
+    i = 0
+    for bbp in np_bbp:
+        if(np.isnan(bbp)):
+            i = i + 1
+            continue
+        if(bbp < 0.0):
+            np_decisions[i] = 1
+            i = i + 1
+            continue
+        if(bbp > 1.0):
+            np_decisions[i] = -1
+            i = i + 1
+            continue
+        if(i != 0):
+            np_decisions[i] = np_decisions[i-1]
+        i = i + 1
+    return np_decisions
+
 def main():
     df_data = getData()
     np_bbp = getBollingerBandIndicator(df_data, 20)
